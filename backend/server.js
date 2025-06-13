@@ -14,10 +14,10 @@ app.use((req, res, next) => {
 });
 
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'simpleuser',
-    password: 'simplepassword',
-    database: 'simpledb'
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'simpleuser',
+    password: process.env.DB_PASSWORD || 'simplepassword',
+    database: process.env.DB_NAME || 'simpledb'
 });
 
 // Test database connection
