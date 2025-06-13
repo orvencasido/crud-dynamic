@@ -8,16 +8,24 @@ pipeline {
             }
         }
 
-        stage('Stop Existing Containers') {
+        stage('Stop Existing Containers and Free Ports') {
             steps {
-                // This will bring down all docker-compose containers related to the project
                 sh 'docker-compose down'
-                
-                // Optional: Kill any container that might be using port 3306
+
+                // Free port 3306 if in use
                 sh '''
                     RUNNING_CONTAINER=$(docker ps --format "{{.ID}} {{.Ports}}" | grep "0.0.0.0:3306" | awk \'{print $1}\')
                     if [ ! -z "$RUNNING_CONTAINER" ]; then
                         echo "Stopping container using port 3306: $RUNNING_CONTAINER"
+                        docker stop $RUNNING_CONTAINER
+                    fi
+                '''
+
+                // Free port 5000 if in use
+                sh '''
+                    RUNNING_CONTAINER=$(docker ps --format "{{.ID}} {{.Ports}}" | grep "0.0.0.0:5000" | awk \'{print $1}\')
+                    if [ ! -z "$RUNNING_CONTAINER" ]; then
+                        echo "Stopping container using port 5000: $RUNNING_CONTAINER"
                         docker stop $RUNNING_CONTAINER
                     fi
                 '''
