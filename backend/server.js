@@ -1,94 +1,70 @@
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql2');
-const app = express();
+const db = require('./db'); // import the db connection pool
 
-// Enable CORS for all routes
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.url}`);
-    next();
-});
-
-const db = mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'simpleuser',
-    password: process.env.DB_PASSWORD || 'simplepassword',
-    database: process.env.DB_NAME || 'simpledb'
-});
-
-// Test database connection
-db.connect((err) => {
-    if (err) {
-        console.error('Error connecting to database:', err);
-        return;
+// Function to test database connection
+async function testConnection() {
+    try {
+        await db.query('SELECT 1');
+        console.log('Database connection successful');
+        return true;
+    } catch (err) {
+        console.log('Database connection failed, retrying in 5 seconds...');
+        return false;
     }
-    console.log('Successfully connected to database');
-});
+}
 
-// Read all items
-app.get('/items', (req, res) => {
-    console.log('GET /items request received');
-    db.query('SELECT * FROM items', (err, results) => {
-        if (err) {
-            console.error('Error fetching items:', err);
-            return res.status(500).json({ error: err.message });
+// Wait for database to be ready
+async function waitForDatabase() {
+    let isConnected = false;
+    while (!isConnected) {
+        isConnected = await testConnection();
+        if (!isConnected) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
         }
-        console.log('Items fetched successfully:', results);
-        res.json(results);
-    });
+    }
+}
+
+// Get all items
+app.get('/items', async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT * FROM items');
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Database error');
+    }
 });
 
-// Create new item
-app.post('/items', (req, res) => {
-    console.log('POST /items request received:', req.body);
+// Add new item
+app.post('/items', async (req, res) => {
     const { name } = req.body;
-    db.query('INSERT INTO items (name) VALUES (?)', [name], (err, results) => {
-        if (err) {
-            console.error('Error creating item:', err);
-            return res.status(500).json({ error: err.message });
-        }
-        console.log('Item created successfully:', results);
-        res.json({ message: 'Item added', id: results.insertId });
-    });
+    try {
+        const [result] = await db.query('INSERT INTO items (name) VALUES (?)', [name]);
+        res.status(201).json({ id: result.insertId, name });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Database error');
+    }
 });
 
 // Delete item
-app.delete('/items/:id', (req, res) => {
+app.delete('/items/:id', async (req, res) => {
     const { id } = req.params;
-    console.log('DELETE /items/:id request received for ID:', id);
-    
-    // Validate ID
-    if (!id || isNaN(parseInt(id))) {
-        console.error('Invalid ID provided:', id);
-        return res.status(400).json({ error: 'Invalid item ID' });
-    }
-
-    db.query('DELETE FROM items WHERE id = ?', [id], (err, results) => {
-        if (err) {
-            console.error('Delete error:', err);
-            return res.status(500).json({ error: err.message });
-        }
-        console.log('Delete results:', results);
-        if (results.affectedRows === 0) {
-            console.log('No item found with ID:', id);
-            return res.status(404).json({ error: 'Item not found' });
-        }
-        console.log('Successfully deleted item with ID:', id);
+    try {
+        await db.query('DELETE FROM items WHERE id = ?', [id]);
         res.json({ message: 'Item deleted successfully' });
-    });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Database error' });
+    }
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Server error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-});
-
-const PORT = 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+// Start server
+waitForDatabase().then(() => {
+    app.listen(5000, () => console.log('Server running on port 5000'));
 });
