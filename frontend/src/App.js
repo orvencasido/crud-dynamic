@@ -6,10 +6,15 @@ function App() {
   const [items, setItems] = useState([]);
   const [name, setName] = useState('');
   const [error, setError] = useState('');
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     fetchItems();
   }, []);
+
+  useEffect(() => {
+    document.body.className = darkMode ? 'dark-mode' : '';
+  }, [darkMode]);
 
   const fetchItems = async () => {
     try {
@@ -62,8 +67,16 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      <h1 className="app-title">Orven CRUD TRY IF GAGANA CICD</h1>
+    <div className={`app-container ${darkMode ? 'dark-mode' : ''}`}>
+      <div className="header-container">
+        <h1 className="app-title">Orven CRUD</h1>
+        <button 
+          className="theme-toggle"
+          onClick={() => setDarkMode(!darkMode)}
+        >
+          {darkMode ? '☀️' : '🌙'}
+        </button>
+      </div>
       {error && <div className="error-message">{error}</div>}
       <div className="input-container">
         <input
